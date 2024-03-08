@@ -161,9 +161,9 @@ func parse(toks tokens) *ast {
 			continue
 		}
 
-		var expr *instr
-		toks, expr = parseInstr(toks)
-		ast.instr = append(ast.instr, expr)
+		var instr *instr
+		toks, instr = parseInstr(toks)
+		ast.instr = append(ast.instr, instr)
 	}
 	return ast
 }

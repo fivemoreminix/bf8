@@ -1,4 +1,4 @@
-package main
+package vm
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+//go:generate stringer -type Opcode
 type Opcode byte
 
 // 0 - 19 Common
@@ -41,15 +42,15 @@ const (
 )
 
 type Op struct {
-	code Opcode
-	args [8]byte
+	Code Opcode
+	Args [8]byte
 }
 
 // Byte returns the byte at args[-i] in Python notation.
 //
 // Byte(0) returns the last byte in args.
 func (op Op) Byte(i int) byte {
-	return op.args[len(op.args)-i-1]
+	return op.Args[len(op.Args)-i-1]
 }
 
 func (op Op) Word(i int) uint16 {
@@ -87,7 +88,7 @@ type Program struct {
 
 	memory    []byte
 	dataStart int           // Index of the data section and where memPtr starts.
-	clockRate time.Duration // Limit the time to compute a Brainfuck instruction.
+	ClockRate time.Duration // Limit the time to compute a Brainfuck instruction.
 	pc        int
 	r8a       byte
 	r8b       byte
@@ -227,7 +228,7 @@ func (p *Program) JumpToOpenLoop() {
 }
 
 func (p *Program) Op(op Op, opChan chan Op) {
-	switch op.code {
+	switch op.Code {
 	case OpNop:
 	case OpRelJmpFwd:
 		p.pc += int(op.Byte(0))
@@ -328,15 +329,15 @@ func (p *Program) Run(opChan chan Op) error {
 			}
 		case '.':
 			op := Op{
-				code: Opcode(p.Byte(p.memPtr)),
-				args: [8]byte{},
+				Code: Opcode(p.Byte(p.memPtr)),
+				Args: [8]byte{},
 			}
 			argsStart := p.memPtr - 8
 			if p.memPtr-8 < 0 {
 				argsStart = 0
 			}
 			// FIXME: args are copied leaving blank space at end if argsStart = 0
-			copy(op.args[:], p.memory[argsStart:p.memPtr])
+			copy(op.Args[:], p.memory[argsStart:p.memPtr])
 			p.Op(op, opChan)
 		case ',':
 		}
@@ -345,10 +346,10 @@ func (p *Program) Run(opChan chan Op) error {
 		p.pc++
 		instr = p.memory[p.pc]
 
-		if p.clockRate > 1 { // If the clockRate > 1 nanosecond
+		if p.ClockRate > 1 { // If the clockRate > 1 nanosecond
 			elapsed := time.Since(start)
-			if elapsed < p.clockRate {
-				duration := p.clockRate - elapsed
+			if elapsed < p.ClockRate {
+				duration := p.ClockRate - elapsed
 				fmt.Printf("%v elapsed, sleeping for %v\n", elapsed, duration)
 				time.Sleep(duration)
 			}

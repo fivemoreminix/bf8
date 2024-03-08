@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/fivemoreminix/bf8/vm"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -14,8 +15,8 @@ const (
 )
 
 type System struct {
-	program *Program
-	opChan  chan Op
+	program *vm.Program
+	opChan  chan vm.Op
 
 	canvas *ebiten.Image
 	color  color.NRGBA
@@ -39,19 +40,19 @@ loop:
 	for range limit {
 		select {
 		case op := <-s.opChan:
-			switch op.code {
-			case OpClearCanvas:
+			switch op.Code {
+			case vm.OpClearCanvas:
 				s.canvas.Clear()
-			case OpSetColor:
+			case vm.OpSetColor:
 				s.color.R = op.Byte(3)
 				s.color.G = op.Byte(2)
 				s.color.B = op.Byte(1)
 				s.color.A = op.Byte(0)
-			case OpSetPixel:
+			case vm.OpSetPixel:
 				x := op.Byte(1)
 				y := op.Byte(0)
 				s.canvas.Set(int(x), int(y), s.color)
-			case OpDrawLine:
+			case vm.OpDrawLine:
 				x1 := float32(op.Byte(3))
 				y1 := float32(op.Byte(2))
 				x2 := float32(op.Byte(1))
@@ -82,7 +83,7 @@ func main() {
 		panic(err)
 	}
 
-	program, err := NewProgram(bytes)
+	program, err := vm.NewProgram(bytes)
 	if err != nil {
 		panic(err)
 	}
@@ -90,11 +91,11 @@ func main() {
 	// Brainfuck is only truly as fast as we can handle its Operations. Increasing the channel
 	// size helps to keep it from blocking, but also handling more operations per Update.
 
-	program.clockRate = time.Millisecond // One brainfuck instruction every millisecond
+	program.ClockRate = time.Millisecond // One brainfuck instruction every millisecond
 
 	system := &System{
 		program: program,
-		opChan:  make(chan Op, 256), // Channels must be buffered to do non-blocking reads
+		opChan:  make(chan vm.Op, 256), // Channels must be buffered to do non-blocking reads
 
 		canvas: ebiten.NewImage(screenWidth, screenHeight),
 		color:  color.NRGBA{},
