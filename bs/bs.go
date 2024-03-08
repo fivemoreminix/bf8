@@ -27,6 +27,11 @@ const (
 	tokColon
 	tokLBracket
 	tokRBracket
+	tokPlus    // '+'
+	tokMinus   // '-'
+	tokStar    // '*'
+	tokSlash   // '/'
+	tokPercent // '%'
 )
 
 type token struct {
@@ -74,6 +79,17 @@ func lex(s *scanner.Scanner) []token {
 			tokens = append(tokens, token{tokLBracket, s.TokenText()})
 		case ']':
 			tokens = append(tokens, token{tokRBracket, s.TokenText()})
+		case '+':
+			tokens = append(tokens, token{tokPlus, s.TokenText()})
+		case '-':
+			tokens = append(tokens, token{tokMinus, s.TokenText()})
+		case '*':
+			tokens = append(tokens, token{tokStar, s.TokenText()})
+		case '/':
+			tokens = append(tokens, token{tokSlash, s.TokenText()})
+		case '%':
+			tokens = append(tokens, token{tokPercent, s.TokenText()})
+
 		default:
 			fmt.Printf("%s: %s\n", scanner.TokenString(tok), s.TokenText())
 		}
@@ -107,6 +123,44 @@ type exprAddr struct{ expr } // exprAddr represents an expression which evaluate
 // expr, call the int() method on the exprAddr.expr value once the type has been checked.
 func (e exprAddr) int(lookup func(string) expr) (int, error) {
 	panic("cannot call int() on exprAddr; not an int itself")
+}
+
+const (
+	exprOpAdd int = iota
+	exprOpSub
+	exprOpMul
+	exprOpDiv
+	exprOpMod
+)
+
+type exprOp struct {
+	op       int
+	lhs, rhs expr
+}
+
+func (e exprOp) int(lookup func(string) expr) (int, error) {
+	l, lerr := e.lhs.int(lookup)
+	if lerr != nil {
+		return l, lerr
+	}
+	r, rerr := e.rhs.int(lookup)
+	if rerr != nil {
+		return r, rerr
+	}
+	switch e.op {
+	case exprOpAdd:
+		return l + r, nil
+	case exprOpSub:
+		return l - r, nil
+	case exprOpMul:
+		return l * r, nil
+	case exprOpDiv:
+		return l / r, nil
+	case exprOpMod:
+		return l % r, nil
+	default:
+		panic("unimplemented op: " + strconv.Itoa(e.op))
+	}
 }
 
 type stmt interface{}
@@ -157,15 +211,31 @@ func parseExprAddr(toks tokens) (tokens, exprAddr) {
 	return toks, exprAddr{expr}
 }
 
-// expr: exprAddr | exprInt
+// expr: exprId | exprAddr | exprInt | expr [+-*/%] expr
 func parseExpr(toks tokens) (tokens, expr) {
+	var lhs expr
 	if toks.next().t == tokId {
-		return parseExprId(toks)
+		toks, lhs = parseExprId(toks)
 	} else if toks.next().t == tokLBracket {
-		return parseExprAddr(toks)
+		toks, lhs = parseExprAddr(toks)
 	} else {
-		return parseExprInt(toks)
+		toks, lhs = parseExprInt(toks)
 	}
+
+	t := toks.next()
+	if t.t >= tokPlus && t.t <= tokPercent {
+		toks = toks.consume() // Consume operation character
+
+		var rhs expr
+		toks, rhs = parseExpr(toks)
+		return toks, exprOp{
+			op:  int(t.t - tokPlus),
+			lhs: lhs,
+			rhs: rhs,
+		}
+	}
+
+	return toks, lhs
 }
 
 func parseStmtInstr(toks tokens) (tokens, *stmtInstr) {
@@ -357,6 +427,8 @@ func (g *gen) instr(instr *stmtInstr) {
 		} else {
 			g.loopEnd()
 		}
+	case "print":
+		fallthrough
 	case "call":
 		if addr, ok := instr.dst.(exprAddr); ok { // call [1]
 			v, err := addr.expr.int(g.lookup)
