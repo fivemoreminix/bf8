@@ -1,0 +1,24 @@
+//dec [0], 101 // red = 0
+//dec [1]      // green = 0
+//dec [2]      // blue = 0
+dec [3]      // alpha = 255
+inc [4], 41  // Set cell 4 to 41 (SetColor)
+call [4]     // Call SetColor
+
+dec [8]      // x2 = 255
+inc [10], 43 // DrawLine
+dec [5], 65  // 256 - 65 = 191, which is the screen height
+while [5]    // while [5] > 0
+
+// Increment RGB values
+inc [0]
+inc [1]
+inc [2]
+call [4]  // Call SetColor
+
+inc [7]   // inc y1
+inc [9]   // inc y2
+call [10] // Call DrawLine
+
+dec [5]
+endwhile
